@@ -9,17 +9,24 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@prisma/client": "^5.16.0",
+    "@prisma/client": "^6.19.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "prisma": "^5.16.0"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/cors": "^2.8.5",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.2",
+    "prisma": "^6.19.3",
     "tsx": "^4.19.1",
     "typescript": "^5.7.2"
+  },
+  "allowScripts": {
+    "@prisma/client": true,
+    "@prisma/engines": true,
+    "esbuild": true,
+    "prisma": true
   }
 }
