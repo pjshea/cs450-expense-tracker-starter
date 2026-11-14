@@ -21,3 +21,7 @@ export const createTransactionSchema = z.object({
 
 /** The TypeScript type Zod builds from the rules above. */
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
+
+// F26B-32: same rules as creating, but every field is optional for an edit.
+export const updateTransactionSchema = createTransactionSchema.partial();
+export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;

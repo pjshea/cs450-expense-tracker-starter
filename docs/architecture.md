@@ -1,6 +1,6 @@
 # Expense Tracker: Architecture and Schema
 
-Team J (Max, Jovhems, Sharon) · CS 450 · Sprint 1
+Team J (Max, Jovhems, Sharon) · CS 450 · Sprint 1 and Sprint 2
 
 This page shows how the app is put together, how one request travels through it, and how the data is stored.
 Boxes with a **dashed border** are planned for later sprints; solid boxes exist in the code today.
@@ -9,6 +9,7 @@ Our original hand-drawn sketch is in [architecture-sketch.pdf](architecture-sket
 ## 1. System architecture
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','secondaryColor':'#ffffff','tertiaryColor':'#ffffff','lineColor':'#000000','textColor':'#000000','mainBkg':'#ffffff','nodeBorder':'#000000','clusterBkg':'#ffffff','clusterBorder':'#000000','titleColor':'#000000','edgeLabelBackground':'#ffffff','actorBkg':'#ffffff','actorBorder':'#000000','actorTextColor':'#000000','actorLineColor':'#000000','signalColor':'#000000','signalTextColor':'#000000','labelBoxBkgColor':'#ffffff','labelBoxBorderColor':'#000000','labelTextColor':'#000000','loopTextColor':'#000000','noteBkgColor':'#ffffff','noteBorderColor':'#000000','noteTextColor':'#000000','activationBkgColor':'#ffffff','activationBorderColor':'#000000','sequenceNumberColor':'#ffffff','attributeBackgroundColorOdd':'#ffffff','attributeBackgroundColorEven':'#ffffff'}}}%%
 flowchart TD
   user(["① User"])
   browser["Web browser<br/>http://localhost:5175"]
@@ -27,7 +28,7 @@ flowchart TD
   subgraph BE["④ Backend · Express 4 + TypeScript · port 4002"]
     direction TB
     mw["cors + express.json"]
-    routes["Routes<br/>GET /api/transactions<br/>GET /api/summary<br/>POST /api/transactions<br/>GET /api/health"]
+    routes["Routes<br/>GET /api/transactions<br/>GET /api/summary<br/>POST /api/transactions<br/>PUT /api/transactions/:id<br/>GET /api/health"]
     zod{"validateBody<br/>Zod schema"}
     prisma["Prisma Client"]
     auth["requireAuth (JWT)"]:::planned
@@ -40,10 +41,10 @@ flowchart TD
 
   subgraph DB["⑤ PostgreSQL 16 · Docker Compose · port 5434"]
     direction LR
-    tUser[("User")]
-    tTx[("Transaction")]
-    tCat[("Category")]:::planned
-    tBud[("Budget")]:::planned
+    tUser["User"]
+    tTx["Transaction"]
+    tCat["Category"]:::planned
+    tBud["Budget"]:::planned
   end
 
   user --> browser
@@ -53,7 +54,7 @@ flowchart TD
   prisma -- "SQL" --> tTx
   prisma -- "SQL" --> tUser
 
-  classDef planned stroke-dasharray: 5 5,fill:#f8fafc,color:#64748b
+  classDef planned stroke-dasharray: 5 5,fill:#ffffff,color:#000000
 ```
 
 | # | Layer | What it does | Key files |
@@ -67,6 +68,7 @@ flowchart TD
 ## 2. One request, step by step: adding an expense
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','secondaryColor':'#ffffff','tertiaryColor':'#ffffff','lineColor':'#000000','textColor':'#000000','mainBkg':'#ffffff','nodeBorder':'#000000','clusterBkg':'#ffffff','clusterBorder':'#000000','titleColor':'#000000','edgeLabelBackground':'#ffffff','actorBkg':'#ffffff','actorBorder':'#000000','actorTextColor':'#000000','actorLineColor':'#000000','signalColor':'#000000','signalTextColor':'#000000','labelBoxBkgColor':'#ffffff','labelBoxBorderColor':'#000000','labelTextColor':'#000000','loopTextColor':'#000000','noteBkgColor':'#ffffff','noteBorderColor':'#000000','noteTextColor':'#000000','activationBkgColor':'#ffffff','activationBorderColor':'#000000','sequenceNumberColor':'#ffffff','attributeBackgroundColorOdd':'#ffffff','attributeBackgroundColorEven':'#ffffff'}}}%%
 sequenceDiagram
   autonumber
   actor U as User
@@ -98,11 +100,62 @@ sequenceDiagram
 
 Adding income is the same flow with `type: "income"`.
 
+## 2b. Sprint 2 additions
+
+### Editing a transaction (F26B-32)
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','secondaryColor':'#ffffff','tertiaryColor':'#ffffff','lineColor':'#000000','textColor':'#000000','mainBkg':'#ffffff','nodeBorder':'#000000','clusterBkg':'#ffffff','clusterBorder':'#000000','titleColor':'#000000','edgeLabelBackground':'#ffffff','actorBkg':'#ffffff','actorBorder':'#000000','actorTextColor':'#000000','actorLineColor':'#000000','signalColor':'#000000','signalTextColor':'#000000','labelBoxBkgColor':'#ffffff','labelBoxBorderColor':'#000000','labelTextColor':'#000000','loopTextColor':'#000000','noteBkgColor':'#ffffff','noteBorderColor':'#000000','noteTextColor':'#000000','activationBkgColor':'#ffffff','activationBorderColor':'#000000','sequenceNumberColor':'#ffffff','attributeBackgroundColorOdd':'#ffffff','attributeBackgroundColorEven':'#ffffff'}}}%%
+sequenceDiagram
+  autonumber
+  participant C as Client (curl or app)
+  participant R as PUT /api/transactions/:id
+  participant V as validateBody (updateTransactionSchema)
+  participant P as Prisma Client
+  participant D as PostgreSQL
+
+  C->>R: PUT JSON with only the fields to change
+  R->>V: check body (same rules as create, every field optional)
+  alt invalid value
+    V-->>C: 400 { error, issues: [{ field, message }] }
+  else empty body
+    R-->>C: 400 "Provide at least one field to update"
+  else valid
+    R->>P: findFirst(id, demo user)
+    alt not found
+      P-->>C: 404 "Transaction not found"
+    else found
+      P->>D: UPDATE "Transaction" (only the sent fields)
+      D-->>P: updated row
+      P-->>C: 200 + updated transaction
+    end
+  end
+```
+
+### Sample data and tests (F26B-73, F26B-30, F26B-72, F26B-53)
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','secondaryColor':'#ffffff','tertiaryColor':'#ffffff','lineColor':'#000000','textColor':'#000000','mainBkg':'#ffffff','nodeBorder':'#000000','clusterBkg':'#ffffff','clusterBorder':'#000000','titleColor':'#000000','edgeLabelBackground':'#ffffff','actorBkg':'#ffffff','actorBorder':'#000000','actorTextColor':'#000000','actorLineColor':'#000000','signalColor':'#000000','signalTextColor':'#000000','labelBoxBkgColor':'#ffffff','labelBoxBorderColor':'#000000','labelTextColor':'#000000','loopTextColor':'#000000','noteBkgColor':'#ffffff','noteBorderColor':'#000000','noteTextColor':'#000000','activationBkgColor':'#ffffff','activationBorderColor':'#000000','sequenceNumberColor':'#ffffff','attributeBackgroundColorOdd':'#ffffff','attributeBackgroundColorEven':'#ffffff'}}}%%
+flowchart LR
+  gen["generateTransactions.ts<br/>repeatable random data (seed 42)<br/>F26B-73"] -->|npm run generate:data| files["data/transactions.json<br/>data/transactions.csv"]
+  gen --> seed["prisma/seed.ts<br/>npx prisma db seed<br/>F26B-30"]
+  seed -->|"delete old sample rows,<br/>create 50 new ones<br/>(one database transaction)"| db["PostgreSQL<br/>Transaction table"]
+  tests["npm test (Vitest + Supertest)<br/>API, generator, seed repeatability,<br/>edit verification"] -->|HTTP requests to app| app["Express app (app.ts)"]
+  app --> db
+  tests -->|run seed twice, compare counts| seed
+```
+
+- **Seeding is repeatable:** running `npx prisma db seed` again replaces the sample rows instead of adding duplicates.
+- **`app.ts` / `index.ts` split (F26B-72):** `app.ts` builds the Express app and `index.ts` only starts the server,
+  so tests can send requests to the app without opening a port.
+- **Test files run one at a time** (`backend/vitest.config.ts`) because the database tests share one database.
+
 ## 3. Database schema
 
 ### Current schema (Sprint 1, matches `backend/prisma/schema.prisma`)
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','secondaryColor':'#ffffff','tertiaryColor':'#ffffff','lineColor':'#000000','textColor':'#000000','mainBkg':'#ffffff','nodeBorder':'#000000','clusterBkg':'#ffffff','clusterBorder':'#000000','titleColor':'#000000','edgeLabelBackground':'#ffffff','actorBkg':'#ffffff','actorBorder':'#000000','actorTextColor':'#000000','actorLineColor':'#000000','signalColor':'#000000','signalTextColor':'#000000','labelBoxBkgColor':'#ffffff','labelBoxBorderColor':'#000000','labelTextColor':'#000000','loopTextColor':'#000000','noteBkgColor':'#ffffff','noteBorderColor':'#000000','noteTextColor':'#000000','activationBkgColor':'#ffffff','activationBorderColor':'#000000','sequenceNumberColor':'#ffffff','attributeBackgroundColorOdd':'#ffffff','attributeBackgroundColorEven':'#ffffff'}}}%%
 erDiagram
   User ||--o{ Transaction : "has many"
   User {
@@ -125,6 +178,7 @@ erDiagram
 ### Target schema (next sprints)
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','secondaryColor':'#ffffff','tertiaryColor':'#ffffff','lineColor':'#000000','textColor':'#000000','mainBkg':'#ffffff','nodeBorder':'#000000','clusterBkg':'#ffffff','clusterBorder':'#000000','titleColor':'#000000','edgeLabelBackground':'#ffffff','actorBkg':'#ffffff','actorBorder':'#000000','actorTextColor':'#000000','actorLineColor':'#000000','signalColor':'#000000','signalTextColor':'#000000','labelBoxBkgColor':'#ffffff','labelBoxBorderColor':'#000000','labelTextColor':'#000000','loopTextColor':'#000000','noteBkgColor':'#ffffff','noteBorderColor':'#000000','noteTextColor':'#000000','activationBkgColor':'#ffffff','activationBorderColor':'#000000','sequenceNumberColor':'#ffffff','attributeBackgroundColorOdd':'#ffffff','attributeBackgroundColorEven':'#ffffff'}}}%%
 erDiagram
   User ||--o{ Transaction : "records"
   User ||--o{ Category : "owns"
@@ -190,7 +244,10 @@ What changes from current to target:
 | F26B-40 Add income | Same route and form with `type: "income"` | Sprint 1 |
 | F26B-31 View transaction history | `GET /api/transactions` from PostgreSQL, shown in the list | Sprint 1 |
 | F26B-41 View income, expense, and net balance | `GET /api/summary`, shown in the three cards | Sprint 1 |
-| F26B-32 Edit a transaction | Add `PUT /api/transactions/:id` reusing the Zod schema | Next |
+| F26B-32 Edit a transaction | `PUT /api/transactions/:id` with `updateTransactionSchema` (API only, no edit form yet) | Sprint 2 |
+| F26B-30 Seed sample transactions | `npx prisma db seed` loads generated data, safely repeatable | Sprint 2 |
+| F26B-73 Generate sample data | `npm run generate:data` writes repeatable JSON/CSV | Sprint 2 |
+| F26B-72 API tests | Vitest + Supertest, `app.ts` / `index.ts` split | Sprint 2 |
 | F26B-5 / F26B-10 Track and filter by category | `Category` table + `categoryId` on Transaction | Next |
 | F26B-42 Filter by date | `date` column, filter with query params | Next |
 | F26B-7 View monthly summary | Group transactions by month in `/api/summary` | Next |

@@ -44,3 +44,44 @@ For the TypeScript change it suggested a typed health-check response: a `HealthR
   sample transactions, so the frontend was getting data from the backend.
 - `http://localhost:4002/` showed "Cannot GET /", which is expected because the backend has no route at `/`.
 - `git check-ignore` confirmed that `backend/.env` and `backend/dist` will not be committed.
+
+## 2026-11-02 - Jovhems (F26B-72, F26B-73, F26B-32, F26B-30)
+- Tool: Claude
+- Used for: setting up Vitest + Supertest, splitting app.ts/index.ts, writing API tests, building the repeatable transaction data generator, implementing PUT /api/transactions/:id with Zod validation, writing the repeatable seed script, and writing seed repeatability and boundary tests.
+- Verified by: running npm test, npm run generate:data, npx prisma db seed (twice, same count), and manual curl requests against the running backend. I reviewed and adjusted generated code, for example fixing the expected error message to match the real validateBody middleware.
+
+## Sharon Johnson (SharonSusan77): Sprint 2, F26B-53 and F26B-54
+
+**Prompt/request:** I asked Claude (Anthropic) to help me verify F26B-32 (Edit a transaction) against its acceptance
+criteria, write tests that prove a valid edit is really saved, and update the architecture diagram for Sprint 2.
+
+**AI response summary:** Claude reviewed the merged PUT route and its tests, pointed out that only error cases were
+tested and that there is no edit form in the frontend, and drafted database tests that read the saved row back from
+PostgreSQL, a verification report, the new edit and seed diagrams, and a fix for the missing POSTGRES variables in
+the root .env.example.
+
+**How I verified it:** I ran npm test with the database running and all 21 tests passed, including the 7 new edit
+verification tests. I checked that the new diagrams render on GitHub and that docker compose starts the database
+with the updated .env.example.
+
+## Sharon Johnson (SharonSusan77): Assignment 2, CI with GitHub Actions
+
+**Prompt/request:** I asked Claude (Anthropic) to help me add a GitHub Actions workflow that runs lint and the backend tests on pull requests.
+
+**AI response summary:** Claude noted the backend had no lint script (so we added ESLint), the tests need PostgreSQL (so the workflow starts a temporary postgres service), and Vitest 5 needs Node 22. It drafted ci.yml and the ESLint config.
+
+**what I verified:** npm run lint passed locally; on the PR I confirmed CI fails on an intentionally broken test and passes after the fix, and updated the readme .
+
+## Assignment 2: GitHub Actions CI/CD Pipeline (Jovhems)
+
+- **Date:** 2026-11-08
+- **Tool:** Claude (Anthropic)
+- **Purpose:** Help setting up the CI workflow, adding ESLint to the backend, writing the README "CI/CD Setup" section, and planning the failing and passing runs.
+- **What I asked:** How to create a GitHub Actions workflow that installs dependencies, lints and runs tests for our backend (Express + Prisma + PostgreSQL + Vitest) and frontend (React + Vite) on pull requests.
+- **What the AI produced:** A draft `ci.yml` with a PostgreSQL service container, an ESLint flat config and lint script for the backend, a README section, and a suggested intentional lint violation for the failure demo.
+- **What I verified or changed:**
+  - Checked our real `package.json` scripts, Prisma provider and `docker-compose.yml` before writing the workflow.
+  - Confirmed `backend/.env` is ignored by git; the CI database uses throwaway credentials only.
+  - Ran `npm run lint` locally before pushing.
+  - Confirmed a failing run and a passing run on the Actions tab.
+- **Reflection:** CI stops at the first failing step, so the earliest error in the log is the one to fix. Running tests against a fresh database in CI also caught tests that only pass when a local database happens to be running.

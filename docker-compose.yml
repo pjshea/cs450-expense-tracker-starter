@@ -1,15 +1,43 @@
 services:
-  postgres:
+  db:
     image: postgres:16
-    restart: unless-stopped
     environment:
-      POSTGRES_USER: appuser
-      POSTGRES_PASSWORD: appsecret
-      POSTGRES_DB: expense_tracker_app
+      POSTGRES_USER: ${POSTGRES_USER:?Copy .env.example to .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
     ports:
-      - '5434:5432'
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./backend
+    environment:
+      PORT: "4002"
+      # TODO 1: Set database hostname to Compose service name (not localhost)
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+    ports:
+      - "4002:4002"
+    depends_on:
+      db:
+        # TODO 2: Ensure API waits until DB health check passes, not just process start
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    environment:
+      # TODO 3: Point API proxy to backend service name and internal port
+      API_PROXY_TARGET: http://api:4002
+    ports:
+      - "5175:5175"
+    depends_on:
+      - api
 
 volumes:
   postgres_data:
+

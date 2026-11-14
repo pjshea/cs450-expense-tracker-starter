@@ -166,3 +166,53 @@ Full diagrams and decisions: [docs/architecture.md](docs/architecture.md)
 - **Schema (Sprint 1):** `User` has many `Transaction`s. Income and expenses share one `Transaction` table with a `type` field, so totals and net balance are simple queries.
 - **Next:** `Category` and `Budget` tables, Login with JWT, edit and filter transactions.
 - **Workflow:** every branch and PR title starts with its Jira key (F26B-xx).
+
+
+## Run with Docker
+
+1. `cp .env.example .env`
+2. `docker compose up --build`
+3. Access UI: http://localhost:5175
+4. Verify API: `curl http://localhost:4002/api/health`
+5. Shutdown: `docker compose down`
+
+### Diagnostics & Verification Log
+
+| Component | Observed Behavior | Underlying Concept |
+|---|---|---|
+| Startup Order | `api` waits for `db` healthcheck | Process running != DB connection ready |
+| Network Bridge | `web` reaches `api:4002` | Docker Compose virtual network DNS |
+
+## Seeding and sample data
+
+Start the database first (from the project root):
+
+```bash
+docker compose up -d
+```
+
+Seed the database. It is safe to run more than once: it removes its own sample rows and re-creates them, so there are no duplicates.
+
+```bash
+cd backend
+npx prisma db seed      # or: npm run seed
+```
+
+Generate a large set of repeatable sample transactions to files:
+
+```bash
+npm --prefix backend run generate:data            # 1,000 transactions, seed 42
+npm --prefix backend run generate:data -- 50000 7 # 50,000 transactions, seed 7
+```
+
+Output goes to `backend/data/transactions.json` and `backend/data/transactions.csv` (git-ignored).
+
+## CI/CD Setup
+
+Every pull request into `main` runs `.github/workflows/ci.yml` on GitHub Actions. Merge only when both jobs are green.
+
+- **Backend:** `npm ci`, `npm run lint` (ESLint), then `npm test` against a temporary PostgreSQL 16 database that exists only during the run.
+- **Frontend:** `npm ci`, then `npm run build` (type-check and build; no tests yet).
+- Read-only access (`contents: read`), Node 22 (required by Vitest 5).
+
+**Reading a failed run:** on the PR, click **Details** next to the red X, open the failed job, and click the first red step. Fix that first error; later steps are skipped, not broken. Lint errors show `file line:column` and the rule name; test failures show the test name with `Expected` vs `Received`. Reproduce it locally with `npm run lint` or `npm test`, fix it, and push. CI reruns automatically.
